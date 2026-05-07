@@ -122,8 +122,8 @@ if bos_bear
 long_entry = is_bullish and (bar_index - last_bos_bull_index < 50) and ta.crossunder(low, last_bull_ob_high) and low > last_bull_ob_low
 short_entry = not is_bullish and (bar_index - last_bos_bear_index < 50) and ta.crossover(high, last_bear_ob_low) and high < last_bear_ob_high
 
-plotshape(long_entry, "Optimal Entry Long", shape.circle, location.belowbar, color.yellow, size=size.medium, text="ENTRY")
-plotshape(short_entry, "Optimal Entry Short", shape.circle, location.abovebar, color.yellow, size=size.medium, text="ENTRY")
+plotshape(long_entry, "Optimal Entry Long", shape.circle, location.belowbar, color.yellow, size=size.normal, text="ENTRY")
+plotshape(short_entry, "Optimal Entry Short", shape.circle, location.abovebar, color.yellow, size=size.normal, text="ENTRY")
 
 alertcondition(long_entry, "Long Entry Signal", "Smart Money Long Entry Detected")
 alertcondition(short_entry, "Short Entry Signal", "Smart Money Short Entry Detected")
