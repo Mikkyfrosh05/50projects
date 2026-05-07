@@ -1,0 +1,113 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © BradTraversy (based on user request)
+
+//@version=5
+indicator("Smart Money Concepts - Liquidity & Structure", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500)
+
+// --- Inputs ---
+pivot_length = input.int(5, "Pivot Lookback Length")
+show_fvg = input.bool(true, "Show Fair Value Gaps")
+show_ob = input.bool(true, "Show Order Blocks")
+show_liquidity = input.bool(true, "Show Liquidity Sweeps")
+fvg_color_bull = input.color(color.new(color.green, 80), "Bullish FVG Color")
+fvg_color_bear = input.color(color.new(color.red, 80), "Bearish FVG Color")
+ob_color_bull = input.color(color.new(color.blue, 70), "Bullish OB Color")
+ob_color_bear = input.color(color.new(color.orange, 70), "Bearish OB Color")
+
+// --- Variables ---
+var float ph = na
+var float pl = na
+var int ph_index = na
+var int pl_index = na
+
+ph := ta.pivothigh(high, pivot_length, pivot_length)
+pl := ta.pivotlow(low, pivot_length, pivot_length)
+
+if not na(ph)
+    ph_index := bar_index - pivot_length
+if not na(pl)
+    pl_index := bar_index - pivot_length
+
+// Market Structure tracking
+var float last_ph = na
+var float last_pl = na
+var bool is_bullish = true
+
+if not na(ph)
+    last_ph := ph
+if not na(pl)
+    last_pl := pl
+
+// --- Liquidity Sweep detection ---
+is_liquidity_grab_high = high > last_ph and close < last_ph and show_liquidity
+is_liquidity_grab_low = low < last_pl and close > last_pl and show_liquidity
+
+plotshape(is_liquidity_grab_high, "Liquidity Sweep High", shape.triangledown, location.abovebar, color.red, size=size.small)
+plotshape(is_liquidity_grab_low, "Liquidity Sweep Low", shape.triangleup, location.belowbar, color.green, size=size.small)
+
+// --- CHoCH & BOS ---
+var float trend_high = na
+var float trend_low = na
+
+// Simple Break detection
+bos_bull = ta.crossover(close, last_ph)
+bos_bear = ta.crossunder(close, last_pl)
+
+// CHoCH detection (Change of Character)
+// If trend was bullish and we break a low -> Bearish CHoCH
+// If trend was bearish and we break a high -> Bullish CHoCH
+choch_bear = is_bullish and close < last_pl
+choch_bull = not is_bullish and close > last_ph
+
+if choch_bull or choch_bear
+    is_bullish := choch_bull
+
+plotshape(choch_bull, "CHoCH Bullish", shape.labelup, location.belowbar, color.green, text="CHoCH", textcolor=color.white)
+plotshape(choch_bear, "CHoCH Bearish", shape.labeldown, location.abovebar, color.red, text="CHoCH", textcolor=color.white)
+plotshape(bos_bull and not choch_bull, "BOS Bullish", shape.arrowup, location.belowbar, color.gray, text="BOS")
+plotshape(bos_bear and not choch_bear, "BOS Bearish", shape.arrowdown, location.abovebar, color.gray, text="BOS")
+
+// --- Fair Value Gaps (FVG) ---
+if show_fvg
+    // Bullish FVG: Low of bar 1 > High of bar 3
+    bullish_fvg = low[0] > high[2] and close[1] > high[2]
+    if bullish_fvg
+        box.new(bar_index[2], low[0], bar_index, high[2], bgcolor=fvg_color_bull, border_color=na)
+
+    // Bearish FVG: High of bar 1 < Low of bar 3
+    bearish_fvg = high[0] < low[2] and close[1] < low[2]
+    if bearish_fvg
+        box.new(bar_index[2], high[0], bar_index, low[2], bgcolor=fvg_color_bear, border_color=na)
+
+// --- Order Blocks (OB) ---
+// Simplified OB: The last candle before a BOS/CHoCH
+if show_ob
+    if bos_bull or choch_bull
+        // Last down candle
+        int ob_index = 0
+        for i = 1 to 10
+            if close[i] < open[i]
+                ob_index := i
+                break
+        box.new(bar_index - ob_index, high[ob_index], bar_index - ob_index + 1, low[ob_index], bgcolor=ob_color_bull, border_color=color.blue, extend=extend.right)
+
+    if bos_bear or choch_bear
+        // Last up candle
+        int ob_index = 0
+        for i = 1 to 10
+            if close[i] > open[i]
+                ob_index := i
+                break
+        box.new(bar_index - ob_index, high[ob_index], bar_index - ob_index + 1, low[ob_index], bgcolor=ob_color_bear, border_color=color.orange, extend=extend.right)
+
+// --- Optimal Entry Signal ---
+// Confluence: Liquidity Grab + CHoCH/BOS
+// An optimal entry is often defined as a structure shift (CHoCH) following a liquidity sweep.
+long_signal = (is_liquidity_grab_low[1] or is_liquidity_grab_low[2] or is_liquidity_grab_low[3]) and (choch_bull or bos_bull)
+short_signal = (is_liquidity_grab_high[1] or is_liquidity_grab_high[2] or is_liquidity_grab_high[3]) and (choch_bear or bos_bear)
+
+plotshape(long_signal, "Optimal Entry Long", shape.circle, location.belowbar, color.yellow, size=size.medium, text="ENTRY")
+plotshape(short_signal, "Optimal Entry Short", shape.circle, location.abovebar, color.yellow, size=size.medium, text="ENTRY")
+
+alertcondition(long_signal, "Long Entry Signal", "Smart Money Long Entry Detected")
+alertcondition(short_signal, "Short Entry Signal", "Smart Money Short Entry Detected")
